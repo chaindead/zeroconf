@@ -75,8 +75,22 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "empty args",
-			args: []string{},
+			name:    "empty args",
+			args:    []string{},
+		},
+		{
+			name:    "long flag with inline equals value",
+			args:    []string{"--name=value", "--other=foo"},
+			awaited: map[string]bool{"name": true, "other": true},
+			found:   map[string]string{"name": "value", "other": "foo"},
+			unknown: map[string]string{},
+		},
+		{
+			name:    "mixed space and inline equals values",
+			args:    []string{"--config", "config.yaml", "--port=5432"},
+			awaited: map[string]bool{"config": true, "port": true},
+			found:   map[string]string{"config": "config.yaml", "port": "5432"},
+			unknown: map[string]string{},
 		},
 	}
 

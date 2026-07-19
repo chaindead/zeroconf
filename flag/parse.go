@@ -29,20 +29,28 @@ func parse(awaited map[string]bool, args []string) (found, unknown map[string]st
 		arg := args[i]
 
 		var name string
-		if strings.HasPrefix(arg, "-") {
-			name = arg[1:]
-		}
-
 		if strings.HasPrefix(arg, "--") {
 			name = arg[2:]
+		} else if strings.HasPrefix(arg, "-") {
+			name = arg[1:]
 		}
 
 		if name == "" {
 			continue
 		}
 
+		// Support the --name=value GNU form: split the value off the flag
+		// name so it is matched against the awaited key and not dropped.
+		var inlineValue string
+		if idx := strings.IndexByte(name, '='); idx >= 0 {
+			inlineValue = name[idx+1:]
+			name = name[:idx]
+		}
+
 		var value string
-		if i+1 < len(args) && len(args[i+1]) > 0 && args[i+1][0] != '-' {
+		if inlineValue != "" {
+			value = inlineValue
+		} else if i+1 < len(args) && len(args[i+1]) > 0 && args[i+1][0] != '-' {
 			value = args[i+1]
 			i++
 		}

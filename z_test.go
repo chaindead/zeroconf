@@ -2,6 +2,7 @@ package zerocfg
 
 import (
 	"net"
+	neturl "net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -152,13 +153,43 @@ func Test_ValueOk(t *testing.T) {
 				}, map[string]any{"float": 1., "str": "val"})
 			},
 		},
+		{
+			varType: "url",
+			init: func() (reg func() any, val any, src map[string]any) {
+				defaultURLStr := "http://default.com/path"
+				valStr := "https://example.com/another?query=1"
+
+				parsedStdURL, err := neturl.Parse(valStr)
+				require.NoError(t, err)
+				expectedVal := urlValue(*parsedStdURL)
+
+				reg = func() any {
+					return URL(name, defaultURLStr, "url description")
+				}
+				return reg, expectedVal, map[string]any{name: valStr}
+			},
+		},
+		{
+			varType: "url empty",
+			init: func() (reg func() any, val any, src map[string]any) {
+				defaultURLStr := "http://default.com/path"
+				valStr := ""
+
+				expectedVal := urlValue{}
+
+				reg = func() any {
+					return URL(name, defaultURLStr, "url description")
+				}
+				return reg, expectedVal, map[string]any{name: valStr}
+			},
+		},
 	}
 
 	dereference := func(t *testing.T, v any) any {
 		val := reflect.ValueOf(v)
 		require.True(t, val.Kind() == reflect.Ptr, "val must be a pointer")
-
-		return val.Elem().Interface()
+		elem := val.Elem()
+		return elem.Interface()
 	}
 
 	for _, tt := range tests {
@@ -172,21 +203,48 @@ func Test_ValueOk(t *testing.T) {
 			require.NoError(t, err)
 
 			actual := dereference(t, ptr)
-			require.EqualValues(t, expected, actual)
+
+			if tt.varType == "url" || tt.varType == "url empty" {
+				actualURLValue, okActual := actual.(urlValue)
+				require.True(t, okActual, "actual should be urlValue")
+				expectedURLValue, okExpected := expected.(urlValue)
+				require.True(t, okExpected, "expected should be urlValue")
+
+				actualStdURL := neturl.URL(actualURLValue)
+				expectedStdURL := neturl.URL(expectedURLValue)
+				require.Equal(t, expectedStdURL.String(), actualStdURL.String())
+			} else {
+				require.EqualValues(t, expected, actual)
+			}
 
 			// check Set and ToString is compatible
 			node, ok := c.vs[name]
 			require.True(t, ok)
 
-			err = node.Value.Set(ToString(actual))
+			stringRepresentation := ToString(actual)
+
+			err = node.Value.Set(stringRepresentation)
 			require.NoError(t, err)
 
 			updatedActual := dereference(t, ptr)
-			require.Equal(t, actual, updatedActual)
+
+			if tt.varType == "url" || tt.varType == "url empty" {
+				updatedActualURLValue, okUpdated := updatedActual.(urlValue)
+				require.True(t, okUpdated)
+				actualURLValue, okActual := actual.(urlValue)
+				require.True(t, okActual)
+
+				updatedStdURL := neturl.URL(updatedActualURLValue)
+				actualStdURL := neturl.URL(actualURLValue)
+				require.Equal(t, actualStdURL.String(), updatedStdURL.String())
+
+			} else {
+				require.Equal(t, actual, updatedActual)
+			}
 
 			// check type name
-			awaitedType := strings.Split(tt.varType, " ")[0]
-			require.Equal(t, awaitedType, node.Value.Type())
+			cleanVarType := strings.Split(tt.varType, " ")[0]
+			require.Equal(t, cleanVarType, node.Value.Type())
 		})
 	}
 }

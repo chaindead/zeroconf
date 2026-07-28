@@ -285,6 +285,18 @@ limits:
   min: 1
 ```
 
+### JSON Source (via URL)
+
+The JSON parser loads configuration from a URL, supporting `file://`, `http://`, and `https://` schemes. Schemeless paths are treated as local files.
+
+First, define a URL option:
+
+```go
+var jsonConfigURL = zfg.URL("json.config", "file:///path/to/your/config.json", "URL for JSON configuration")
+// Or for an optional remote config:
+// var remoteJsonConfigURL = zfg.URL("json.remote", "", "Optional remote JSON config URL (http/https)")
+```
+
 **Example Go config:**
 
 ```go
@@ -292,6 +304,16 @@ zfg.Str("group.option", "", "hierarchical usage")
 zfg.Ints("numbers", nil, "slice of server configs")
 zfg.Map("limits", nil, "map of limits")
 ```
+Then, add it to `zerocfg.Parse`:
+
+```go
+err := zerocfg.Parse(
+    // ... other providers
+    json.New(jsonConfigURL),
+)
+```
+
+If the `json.config` URL option is not provided (or its default is empty), the JSON provider will be skipped without error.
 
 ## Advanced Usage
 
